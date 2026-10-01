@@ -1,4 +1,5 @@
 # Render Blueprint — In-Office Task Scheduler & Automated Reminder System
+# 100% FREE: Render free tier + Render PostgreSQL free tier + UltraMsg free tier + Gmail SMTP + Google Calendar API
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
@@ -13,7 +14,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: file:./prod.db
+        fromDatabase:
+          name: task-scheduler-db
+          property: connectionString
       - key: ULTRA_INSTANCE_ID
         sync: false
       - key: ULTRA_TOKEN
@@ -36,3 +39,9 @@ services:
         sync: false
       - key: REMINDER_INTERVAL_MIN
         value: "30"
+
+databases:
+  - name: task-scheduler-db
+    plan: free
+    databaseName: taskscheduler
+    user: taskscheduler

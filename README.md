@@ -1,6 +1,6 @@
 # 📋 OfficeTask — In-Office Task Scheduler & Automated Reminder System
 
-A production-ready, lightweight web application for assigning in-office tasks to team
+A production-ready, **100% free** web application for assigning in-office tasks to team
 handlers and automatically reminding everyone until work is approved.
 
 ## ✨ Features
@@ -17,25 +17,26 @@ handlers and automatically reminding everyone until work is approved.
 - **Settings module** — manage handlers (add/edit/delete), update admin profile, link/relink Google Calendar
 - **Full notification audit log** (every WhatsApp/email/calendar call is recorded)
 
-## 🏗️ Tech Stack
+## 🏗️ Tech Stack — 100% Free
 
-| Layer     | Technology |
-|-----------|------------|
-| Frontend  | Next.js 14 (App Router) + React 18 + Tailwind CSS |
-| Backend   | Next.js API Routes (Node.js) |
-| Scheduler | node-cron (started via `instrumentation.ts`) |
-| Database  | SQLite via Prisma ORM |
-| WhatsApp  | UltraMsg API (swap-ready for Twilio / WhatsApp Business API) |
-| Email     | Nodemailer (SMTP) |
-| Calendar  | Google Calendar API (`googleapis`, OAuth2) |
+| Layer     | Technology | Cost |
+|-----------|------------|------|
+| Frontend  | Next.js 14 (App Router) + React 18 + Tailwind CSS | Free |
+| Backend   | Next.js API Routes (Node.js) | Free |
+| Scheduler | node-cron (started via `instrumentation.ts`) | Free |
+| Database  | PostgreSQL (Render free tier / local Docker) | Free |
+| WhatsApp  | UltraMsg API (free tier) | Free |
+| Email     | Nodemailer + Gmail SMTP (App Password) | Free |
+| Calendar  | Google Calendar API (`googleapis`, OAuth2) | Free |
+| Hosting   | Render free tier | Free |
 
 ## 📁 Project Structure
 
 ```
 task-scheduler/
 ├── .env.example                  # Environment variable template
-├── src/
-│   ├── instrumentation.ts       # Starts the cron scheduler with the server
+├── docker-compose.yml           # Local PostgreSQL (free)
+├── render.yaml                  # Render blueprint (PostgreSQL + web service)
 ├── prisma/
 │   ├── schema.prisma            # Admin, Session, Handler, Task, Log tables
 │   └── seed.ts                  # Seeds admin + 6 task handlers
@@ -69,24 +70,29 @@ task-scheduler/
 
 ## 🚀 Local Deployment — Step by Step
 
-### 1. Install & configure
+### 1. Start PostgreSQL (free, via Docker)
 
 ```bash
-cd task-scheduler
-npm install          # also runs `prisma generate` automatically
-cp .env.example .env # then edit .env with your credentials
+docker compose up -d
 ```
 
-### 2. Create the database & seed it
+### 2. Install & configure
 
 ```bash
-npm run db:setup     # prisma db push + seed (admin + 6 handlers)
+npm install
+cp .env.example .env   # then edit .env with your credentials
 ```
 
-### 3. Run
+### 3. Create the database & seed it
 
 ```bash
-npm run dev          # http://localhost:3000
+npm run db:setup       # prisma db push + seed (admin + 6 handlers)
+```
+
+### 4. Run
+
+```bash
+npm run dev            # http://localhost:3000
 ```
 
 Log in with the seeded admin credentials:
@@ -96,7 +102,7 @@ Log in with the seeded admin credentials:
 | Passcode | `Engstella`      |
 | WhatsApp | `+2348133226669` |
 
-### 4. Production
+### 5. Production build
 
 ```bash
 npm run build
@@ -105,9 +111,59 @@ npm start
 
 ---
 
+## ☁️ Deploy to Render (Free)
+
+### 1. Push to GitHub
+```bash
+git add -A && git commit -m "update" && git push
+```
+
+### 2. Create Web Service on Render
+1. Go to [render.com](https://render.com) → sign in with GitHub
+2. **New +** → **Web Service** → select your repo
+3. Render auto-detects `render.yaml` — it creates:
+   - A **free web service** (Node.js)
+   - A **free PostgreSQL database**
+4. Fill in the `sync: false` environment variables (see below)
+5. Click **Create Web Service**
+
+### 3. Environment Variables
+
+| Variable | Where to get it |
+|----------|----------------|
+| `ULTRA_INSTANCE_ID` | [ultramsg.com](https://ultramsg.com) → instance ID |
+| `ULTRA_TOKEN` | [ultramsg.com](https://ultramsg.com) → instance token |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | your Gmail address |
+| `SMTP_PASS` | Gmail App Password (16 chars) |
+| `EMAIL_FROM` | `Task Scheduler <you@gmail.com>` |
+| `GOOGLE_CLIENT_ID` | Google Cloud Console → OAuth credentials |
+| `GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth credentials |
+| `GOOGLE_REDIRECT_URI` | `https://your-app.onrender.com/api/google/callback` |
+
+### 4. Custom Domain
+
+1. In Render dashboard → your service → **Settings** → **Custom Domains**
+2. Click **Add Custom Domain** → enter your domain (e.g. `tasks.yourdomain.com`)
+3. Render shows DNS records — add them at your domain registrar:
+   - **CNAME** record: `tasks.yourdomain.com` → `your-app.onrender.com`
+4. Wait for DNS propagation (up to 24h, usually minutes)
+5. Render auto-provisions a **free SSL certificate**
+
+### 5. Update Google OAuth Redirect URI
+
+After deployment, update the redirect URI in Google Cloud Console:
+```
+https://your-app.onrender.com/api/google/callback
+```
+(or `https://tasks.yourdomain.com/api/google/callback` if using custom domain)
+
+---
+
 ## 🔌 Integration Setup
 
-### WhatsApp — UltraMsg
+### WhatsApp — UltraMsg (Free)
 
 1. Create an account at [ultramsg.com](https://ultramsg.com).
 2. Add an instance and link a WhatsApp number (QR scan).
@@ -115,29 +171,26 @@ npm start
 4. Set `ULTRA_INSTANCE_ID` and `ULTRA_TOKEN` in `.env`.
 5. Verify with **Settings → Send Test WhatsApp**.
 
-> To use Twilio / WhatsApp Business API instead, replace the body of
-> `src/lib/whatsapp.ts` — keep the `sendWhatsApp(to, body)` signature.
+### Email — Gmail SMTP (Free)
 
-### Email — Nodemailer SMTP
-
-1. For Gmail: enable 2FA and create an **App Password** at myaccount.google.com/apppasswords.
-2. Set in `.env`:
+1. Enable 2FA on your Google account.
+2. Create an **App Password** at myaccount.google.com/apppasswords.
+3. Set in `.env`:
    ```
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_USER=you@gmail.com
-   SMTP_PASS=your-app-password
+   SMTP_PASS=your-16-char-app-password
    EMAIL_FROM="Task Scheduler <you@gmail.com>"
    ```
-3. Verify with **Settings → Send Test Email**.
+4. Verify with **Settings → Send Test Email**.
 
-### Google Calendar — OAuth2
+### Google Calendar — OAuth2 (Free)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create a project.
 2. **APIs & Services → Library → enable "Google Calendar API"**.
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID** (Web application).
-4. Add an **Authorized redirect URI** matching `GOOGLE_REDIRECT_URI` in `.env`
-   (default: `http://localhost:3000/api/google/callback`).
+4. Add an **Authorized redirect URI** matching `GOOGLE_REDIRECT_URI` in `.env`.
 5. Copy the **Client ID** and **Client Secret** into `.env`.
 6. In the app: **Settings → Connect Google Calendar** → approve consent.
 7. Use **Re-link Account** any time to refresh tokens.
@@ -168,4 +221,20 @@ Every notification is recorded in the `Log` table for auditing.
 - Sessions use `httpOnly`, `sameSite=lax` cookies with 7-day expiry.
 - All API routes require an authenticated admin session.
 - Store real credentials in `.env` (never committed — see `.gitignore`).
-- For production, serve over HTTPS and set a strong admin passcode.
+- For production, serve over HTTPS (Render provides free SSL).
+
+## 💰 Cost Summary
+
+| Service | Cost |
+|---------|------|
+| Render web service (free tier) | $0 |
+| Render PostgreSQL (free tier) | $0 |
+| UltraMsg WhatsApp (free tier) | $0 |
+| Gmail SMTP | $0 |
+| Google Calendar API | $0 |
+| **Total** | **$0** |
+
+> **Note:** Render's free tier spins down after ~15 min of inactivity.
+> The cron scheduler only runs while the service is awake. For 24/7 reminders,
+> consider the Starter plan ($7/mo) or use an external ping service like
+> UptimeRobot (free) to keep the service awake.

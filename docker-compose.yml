@@ -1,0 +1,24 @@
+# Local development with PostgreSQL (free — no subscription needed)
+# Usage: docker compose up -d
+# Then set DATABASE_URL in .env to: postgresql://taskscheduler:taskscheduler@localhost:5432/taskscheduler
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: task-scheduler-db
+    environment:
+      POSTGRES_USER: taskscheduler
+      POSTGRES_PASSWORD: taskscheduler
+      POSTGRES_DB: taskscheduler
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskscheduler"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

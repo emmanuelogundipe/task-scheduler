@@ -1,6 +1,6 @@
 // ============================================================
 // In-Office Task Scheduler & Automated Reminder System
-// Database Schema (SQLite via Prisma)
+// Database Schema (PostgreSQL — works locally via Docker and on Render)
 // ============================================================
 
 generator client {
@@ -8,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
