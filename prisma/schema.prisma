@@ -1,0 +1,97 @@
+// ============================================================
+// In-Office Task Scheduler & Automated Reminder System
+// Database Schema (SQLite via Prisma)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// Admin — the single system administrator (Engr. Mrs. Stella)
+// ------------------------------------------------------------
+model Admin {
+  id           Int       @id @default(autoincrement())
+  name         String
+  whatsapp     String
+  email        String
+  passcode     String
+  googleTokens   String?   // JSON-serialized OAuth2 tokens
+  googleEmail  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  handlers     Handler[]
+  tasks        Task[]
+}
+
+// ------------------------------------------------------------
+// Session — login sessions (httpOnly cookie token)
+// ------------------------------------------------------------
+model Session {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  adminId   Int
+  admin     Admin    @relation(fields: [adminId], references: [id])
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// Handler — task handlers (team members)
+// ------------------------------------------------------------
+model Handler {
+  id        Int      @id @default(autoincrement())
+  name      String
+  whatsapp  String   @unique
+  active    Boolean  @default(true)
+  adminId   Int
+  admin     Admin    @relation(fields: [adminId], references: [id])
+  tasks     Task[]
+  createdAt DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// Task — unlimited tasks, tracked with milestone flags so the
+// scheduler never sends the same notification twice.
+// ------------------------------------------------------------
+model Task {
+  id               Int       @id @default(autoincrement())
+  title            String
+  description      String    @default("")
+  status           String    @default("IN_PROGRESS") // IN_PROGRESS | PENDING_APPROVAL | COMPLETED
+  startTime        DateTime
+  durationMinutes  Int
+  deadline         DateTime
+  handlerId        Int
+  handler          Handler   @relation(fields: [handlerId], references: [id])
+  adminId          Int
+  admin            Admin     @relation(fields: [adminId], references: [id])
+  milestone50      Boolean   @default(false) // 50% elapsed alert sent
+  milestone70      Boolean   @default(false) // 70% elapsed alert sent
+  deadlineNotified Boolean   @default(false) // 100% deadline alerts sent
+  lastReminderAt   DateTime? // last periodic handler reminder
+  createdAt        DateTime  @default(now())
+  completedAt      DateTime?
+  logs             Log[]
+}
+
+// ------------------------------------------------------------
+// Log — audit trail of every notification the system sends
+// ------------------------------------------------------------
+model Log {
+  id        Int      @id @default(autoincrement())
+  taskId    Int?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  type      String   // WHATSAPP | EMAIL | CALENDAR | SYSTEM
+  recipient String
+  message   String
+  status    String   // SENT | FAILED | SKIPPED
+  error     String?
+  createdAt DateTime @default(now())
+}

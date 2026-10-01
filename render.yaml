@@ -1,0 +1,38 @@
+# Render Blueprint — In-Office Task Scheduler & Automated Reminder System
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: task-scheduler
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build && npx prisma db push && npx prisma db seed
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: ULTRA_INSTANCE_ID
+        sync: false
+      - key: ULTRA_TOKEN
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: REMINDER_INTERVAL_MIN
+        value: "30"
