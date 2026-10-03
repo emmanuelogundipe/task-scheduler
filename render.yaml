@@ -1,5 +1,7 @@
 # Render Blueprint — In-Office Task Scheduler & Automated Reminder System
-# 100% FREE: Render free tier + Render PostgreSQL free tier + UltraMsg free tier + Gmail SMTP + Google Calendar API
+# 100% FREE: Render free tier + Render PostgreSQL free tier + UltraMsg free tier
+# WhatsApp-only setup: email (SMTP) and Google Calendar env vars are no longer
+# required in the Blueprint. Add them later via the Render dashboard if needed.
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
@@ -20,22 +22,6 @@ services:
       - key: ULTRA_INSTANCE_ID
         sync: false
       - key: ULTRA_TOKEN
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: EMAIL_FROM
-        sync: false
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: GOOGLE_REDIRECT_URI
         sync: false
       - key: REMINDER_INTERVAL_MIN
         value: "30"
