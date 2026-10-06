@@ -4,9 +4,9 @@ import { requireAdmin } from '@/lib/api';
 import { logAudit } from '@/lib/audit';
 import { hashPasscode } from '@/lib/auth';
 import { isValidWhatsApp, isValidInterval, normalizeWhatsApp } from '@/lib/validation';
-import { whatsappConfigured, whatsappInstanceStatus, maskSecret } from '@/services/ultramsgService';
+import { fetchInstanceStatus, maskSecret } from '@/services/ultramsgService';
 
-// GET /api/settings — admin profile + WhatsApp integration status
+// GET /api/settings — admin profile + live WhatsApp integration status
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -16,6 +16,7 @@ export async function GET() {
 
   const instance = process.env.ULTR_INSTANCE_ID || process.env.ULTRA_INSTANCE_ID || '';
   const token = process.env.ULTRA_TOKEN || '';
+  const live = await fetchInstanceStatus();
 
   return NextResponse.json({
     settings: {
@@ -26,8 +27,11 @@ export async function GET() {
     },
     whatsapp: {
       provider: 'UltraMsg',
-      configured: whatsappConfigured(),
-      instanceStatus: whatsappInstanceStatus(),
+      configured: live.configured,
+      connected: live.connected,
+      instanceStatus: live.connected ? 'connected' : live.configured ? 'not_connected' : 'not_configured',
+      statusDetail: live.status,
+      error: live.error ?? null,
       instanceId: instance ? maskSecret(instance, 3) : '',
       tokenMasked: token ? maskSecret(token) : '',
     },

@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       provider: l.provider,
       status: l.status,
       error: l.status === 'FAILED' ? l.providerResponse : null,
+      providerResponse: l.providerResponse,
       sentAt: l.sentAt,
       createdAt: l.createdAt,
     })),

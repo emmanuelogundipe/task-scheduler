@@ -13,7 +13,10 @@ interface SettingsData {
 interface WhatsappStatus {
   provider: string;
   configured: boolean;
+  connected: boolean;
   instanceStatus: string;
+  statusDetail: string;
+  error: string | null;
   instanceId: string;
   tokenMasked: string;
 }
@@ -175,10 +178,12 @@ export default function SettingsClient() {
           <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
             <dt className="text-xs uppercase tracking-wide text-slate-500">Instance</dt>
             <dd className="mt-1">
-              {whatsapp?.configured ? (
+              {whatsapp?.connected ? (
                 <span className="font-medium text-emerald-400">Connected</span>
+              ) : whatsapp?.configured ? (
+                <span className="font-medium text-amber-400">Not linked</span>
               ) : (
-                <span className="font-medium text-amber-400">Not configured</span>
+                <span className="font-medium text-red-400">Not configured</span>
               )}
             </dd>
           </div>
@@ -191,9 +196,32 @@ export default function SettingsClient() {
         </dl>
 
         {whatsapp && !whatsapp.configured && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            UltraMsg credentials are missing. Set <code>ULTR_INSTANCE_ID</code> and{' '}
+            <code>ULTRA_TOKEN</code> in Render&apos;s Environment tab.
+          </div>
+        )}
+
+        {whatsapp && whatsapp.configured && !whatsapp.connected && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
-            Set <code>ULTR_INSTANCE_ID</code> and <code>ULTRA_TOKEN</code> in your <code>.env</code> file to
-            enable WhatsApp messages.
+            <p className="font-semibold">WhatsApp is not linked to your UltraMsg instance.</p>
+            <p className="mt-1">
+              UltraMsg is accepting our API calls (requests are logged as <b>SENT</b>), but messages
+              cannot be delivered until a WhatsApp number is connected. Open your{' '}
+              <a
+                href="https://app.ultramsg.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                UltraMsg dashboard
+              </a>{' '}
+              → your instance → <b>scan the QR code</b> with the WhatsApp app on the sending phone,
+              then return here and reload.
+            </p>
+            {whatsapp.statusDetail && (
+              <p className="mt-1 text-xs text-amber-500/80">UltraMsg status: {whatsapp.statusDetail}</p>
+            )}
           </div>
         )}
 

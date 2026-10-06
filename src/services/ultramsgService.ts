@@ -20,6 +20,51 @@ export function whatsappInstanceStatus(): 'connected' | 'not_configured' {
   return whatsappConfigured() ? 'connected' : 'not_configured';
 }
 
+export interface InstanceStatus {
+  configured: boolean;
+  /** True only when UltraMsg reports the linked WhatsApp account is connected. */
+  connected: boolean;
+  status: string;
+  error?: string;
+}
+
+/**
+ * Ask UltraMsg for the real instance status. This is the source of
+ * truth for whether the WhatsApp number is actually linked (QR scanned).
+ */
+export async function fetchInstanceStatus(): Promise<InstanceStatus> {
+  if (!whatsappConfigured()) {
+    return { configured: false, connected: false, status: 'not_configured' };
+  }
+  try {
+    const res = await fetch(
+      `${ULTRAMSG_BASE}/instance${INSTANCE}/status?token=${encodeURIComponent(TOKEN)}`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+    const raw = await res.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { raw };
+    }
+    const status = String(data?.status ?? data?.accountStatus ?? '').toLowerCase();
+    const connected =
+      status === 'authenticated' ||
+      status === 'connected' ||
+      data?.connected === true ||
+      data?.authenticated === true;
+    return { configured: true, connected, status: status || raw.slice(0, 120) };
+  } catch (e: any) {
+    return {
+      configured: true,
+      connected: false,
+      status: 'unreachable',
+      error: e?.message ?? 'Could not reach UltraMsg',
+    };
+  }
+}
+
 /** Mask a token so it is safe to render in the UI. */
 export function maskSecret(value: string, visible = 0): string {
   if (!value) return '';
