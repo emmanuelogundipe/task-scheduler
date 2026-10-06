@@ -1,26 +1,45 @@
 # ============================================================
-# Odyssey Scheduler — Docker Compose (self-contained, SQLite)
+# Odyssey Scheduler — Docker Compose
+# App + a local PostgreSQL database, fully self-contained.
 # Usage: docker compose up --build
-# The SQLite database persists in the named volume `odyssey-data`.
 # ============================================================
 
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: odyssey-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: odyssey
+      POSTGRES_PASSWORD: odyssey
+      POSTGRES_DB: odyssey
+    ports:
+      - "5432:5432"
+    volumes:
+      - odyssey-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odyssey"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     container_name: odyssey-scheduler
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: "file:/data/odyssey.db"
+      DATABASE_URL: "postgresql://odyssey:odyssey@db:5432/odyssey"
       APP_TIMEZONE: "Africa/Lagos"
       TASK_REMINDER_INTERVAL_MINUTES: "30"
       ULTR_INSTANCE_ID: "${ULTR_INSTANCE_ID}"
       ULTRA_TOKEN: "${ULTRA_TOKEN}"
-    volumes:
-      - odyssey-data:/data
 
 volumes:
-  odyssey-data:
+  odyssey-pgdata:

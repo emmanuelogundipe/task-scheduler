@@ -30,4 +30,7 @@ npm-debug.log*
 next-env.d.ts
 
 # database backups
-/prisma/backups/
+/backups/
+
+# local postgres data
+/pgdata/

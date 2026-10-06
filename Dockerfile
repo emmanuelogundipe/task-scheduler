@@ -1,5 +1,5 @@
 # ============================================================
-# Odyssey Scheduler — production image
+# Odyssey Scheduler — production image (PostgreSQL)
 # ============================================================
 FROM node:20-alpine
 
@@ -15,11 +15,11 @@ RUN npx prisma generate && npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV DATABASE_URL="file:/data/odyssey.db"
 ENV APP_TIMEZONE="Africa/Lagos"
 
 EXPOSE 3000
 
-# Migrations, seed defaults, then start the server (the cron
+# Sync the schema, seed defaults, then start the server (the cron
 # scheduler starts automatically via instrumentation.ts).
-CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npm start"]
+# DATABASE_URL must point to a PostgreSQL database.
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npx prisma db seed && npm start"]

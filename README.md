@@ -35,10 +35,10 @@ Admin → Odyssey Scheduler → UltraMsg → WhatsApp
 - **Settings** — edit admin name, login WhatsApp number and passcode; configure the reminder interval; test the WhatsApp connection.
 - **Africa/Lagos timezone** — all task times, deadlines and progress are computed in the configured timezone, regardless of the server's local timezone.
 - **Responsive UI** — professional, lightweight Tailwind interface for desktop, tablet and mobile.
-- **SQLite database** — standalone deployment with no external database server.
+- **PostgreSQL database** — works with a free Neon database or local Docker; no paid hosting required.
 - **Login rate-limiting** — repeated failed attempts are throttled to slow brute-force attacks.
 - **Optional external cron endpoint** — `/api/cron/run` (secret-guarded) lets reminders run on hosts without a long-running process.
-- **Database backup script** — `npm run db:backup` writes rotating timestamped copies of the SQLite file.
+- **Database backup script** — `npm run db:backup` writes rotating timestamped PostgreSQL dumps.
 
 ---
 
@@ -49,7 +49,7 @@ Admin → Odyssey Scheduler → UltraMsg → WhatsApp
 | Frontend   | Next.js 14 (App Router) + React 18 + Tailwind CSS |
 | Backend    | Next.js API Routes (Node.js)            |
 | Scheduler  | node-cron (started via `instrumentation.ts`) |
-| Database   | SQLite via Prisma ORM                   |
+| Database   | PostgreSQL via Prisma ORM               |
 | WhatsApp   | UltraMsg API (the only external service)|
 | Auth       | bcryptjs + DB-backed httpOnly sessions  |
 
@@ -64,6 +64,7 @@ odyssey-scheduler/
 │   └── seed.ts                # Seeds admin + 6 task handlers
 ├── scripts/
 │   ├── smoke.ts               # End-to-end HTTP smoke test
+│   ├── backup-db.ts           # PostgreSQL backup (pg_dump)
 │   └── run-scheduler-once.ts  # One-off scheduler pass (external cron)
 ├── src/
 │   ├── instrumentation.ts     # Boots bootstrap + cron scheduler with the server
@@ -104,7 +105,8 @@ odyssey-scheduler/
 - **Node.js 18+** (Node 20 recommended)
 - **npm**
 - An **UltraMsg** account (free tier available) — [ultramsg.com](https://ultramsg.com)
-- No PostgreSQL, no Google account, no email account required.
+- A **PostgreSQL database** — free at [neon.tech](https://neon.tech) (no card required) or via local Docker
+- No Google account and no email account required.
 
 ---
 
@@ -127,8 +129,9 @@ cp .env.example .env
 NODE_ENV=development
 PORT=3000
 
-# Database (SQLite — standalone)
-DATABASE_URL="file:./dev.db"
+# Database (PostgreSQL)
+# Free cloud: Neon (https://neon.tech). Local Docker: the URL below.
+DATABASE_URL="postgresql://odyssey:odyssey@localhost:5432/odyssey"
 
 # Authentication (optional — sessions are random DB-backed tokens)
 SESSION_SECRET="change-me-to-a-long-random-string"
@@ -151,7 +154,8 @@ CRON_SECRET=""
 
 ## 🗄️ Database Setup
 
-Create the SQLite schema and seed the default admin and task handlers:
+Point `DATABASE_URL` at a PostgreSQL database, then create the schema and seed the
+default admin and task handlers:
 
 ```bash
 npm run db:setup      # prisma db push + seed
@@ -163,6 +167,7 @@ Or separately:
 npm run db:push       # apply the schema
 npm run db:seed       # seed admin + handlers
 npm run migrate       # create a migration during development
+npm run db:backup     # dump the database (requires pg_dump)
 ```
 
 ### Seeded accounts
@@ -205,32 +210,40 @@ npm run build
 npm start
 ```
 
-### Docker (self-contained, SQLite)
+### Docker (self-contained: app + PostgreSQL)
 
 ```bash
 docker compose up --build
 ```
 
-The SQLite database is persisted in the `odyssey-data` Docker volume.
+The database is persisted in the `odyssey-pgdata` Docker volume.
 
-### Render
+### Render (free tier + free Neon PostgreSQL)
 
-`render.yaml` is included. SQLite requires a **persistent disk** so data survives
-restarts; set the following secrets in the Render dashboard:
+`render.yaml` is included. It deploys the app on Render's **free** web service and
+uses an **external PostgreSQL** database, so no paid disk or card is required.
 
-| Variable           | Value                          |
-|--------------------|--------------------------------|
-| `ULTR_INSTANCE_ID` | UltraMsg instance ID           |
-| `ULTRA_TOKEN`      | UltraMsg token                 |
+1. Create a free PostgreSQL database at [neon.tech](https://neon.tech) (no card).
+2. Copy its connection string (it looks like
+   `postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require`).
+3. In Render, create a **Blueprint** from this repo and supply the prompts:
 
-`CRON_SECRET` is generated automatically by the blueprint.
+   | Variable           | Value                                   |
+   |--------------------|-----------------------------------------|
+   | `DATABASE_URL`     | Your Neon connection string             |
+   | `ULTR_INSTANCE_ID` | UltraMsg instance ID                    |
+   | `ULTRA_TOKEN`      | UltraMsg token                          |
 
-> **Free tier:** the service spins down when idle, which pauses the in-process
-> scheduler. Keep it awake with a free uptime monitor (e.g. UptimeRobot) pinging
-> `/api/health` every 5 minutes, or call the secret-guarded endpoint
-> `/api/cron/run?secret=YOUR_CRON_SECRET` every minute from an external cron.
-> Note the free tier also has no persistent disk, so the SQLite database resets
-> on restart — use the paid tier (or Docker on a VPS) for real data.
+   `CRON_SECRET` is generated automatically by the blueprint.
+
+4. Deploy. The build pushes the schema, seeds the admin + handlers, then starts
+   the server.
+
+> **Free tier note:** Render's free service spins down when idle, which pauses the
+> in-process scheduler. Keep it awake with a free uptime monitor (e.g.
+> UptimeRobot) pinging `/api/health` every 5 minutes, or call the secret-guarded
+> endpoint `/api/cron/run?secret=YOUR_CRON_SECRET` every minute from an external
+> cron. The database itself is hosted on Neon, so data persists regardless.
 
 ---
 
@@ -340,7 +353,7 @@ and scheduling calculations use it. To change it, update `APP_TIMEZONE` and the
 
 | Service | Cost |
 |---------|------|
-| SQLite database | Free (self-hosted file) |
+| PostgreSQL database (Neon free tier) | Free |
 | UltraMsg WhatsApp | Free tier available |
 | Hosting | Your choice (Render free tier, Docker, VPS, …) |
 

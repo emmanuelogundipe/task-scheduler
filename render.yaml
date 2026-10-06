@@ -1,28 +1,29 @@
 # Render Blueprint — Odyssey Scheduler
-# SQLite keeps the app standalone. A persistent disk is required so
-# the database survives restarts/redeploys (disks require a paid plan;
-# on the free tier the DB resets whenever the service restarts).
+# FREE deployment: Render free web service + a free external PostgreSQL
+# (e.g. Neon) so task data persists without a paid disk.
 #
-# The long-running node-cron engine starts automatically with the
-# server. On the free tier (which spins down when idle), either keep
-# the service awake with an uptime monitor hitting /api/health every
-# few minutes, or set CRON_SECRET and schedule an external cron to
-# call /api/cron/run every minute.
+# Set DATABASE_URL to your Postgres connection string (Neon free tier)
+# when Render prompts for the environment variables.
+#
+# The reminder engine (node-cron) starts with the server, but Render's
+# free service spins down when idle. Keep it awake with a free uptime
+# monitor (e.g. UptimeRobot) pinging /api/health every 5 minutes, or set
+# CRON_SECRET and call /api/cron/run?secret=... every minute externally.
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
   - type: web
     name: odyssey-scheduler
     runtime: node
-    plan: starter
-    buildCommand: npm install && npx prisma migrate deploy && npx prisma generate && npm run build && npx prisma db seed
+    plan: free
+    buildCommand: npm install && npx prisma generate && npx prisma db push --skip-generate && npm run build && npx prisma db seed
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: file:/var/data/odyssey.db
+        sync: false
       - key: APP_TIMEZONE
         value: Africa/Lagos
       - key: TASK_REMINDER_INTERVAL_MINUTES
@@ -33,7 +34,3 @@ services:
         sync: false
       - key: CRON_SECRET
         generateValue: true
-    disk:
-      name: odyssey-data
-      mountPath: /var/data
-      sizeGB: 1
