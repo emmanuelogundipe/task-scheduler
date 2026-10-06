@@ -24,6 +24,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Ensure npm installs devDependencies during the build even though
+      # NODE_ENV=production would otherwise skip them.
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: APP_TIMEZONE
