@@ -1,24 +1,26 @@
-# Local development with PostgreSQL (free — no subscription needed)
-# Usage: docker compose up -d
-# Then set DATABASE_URL in .env to: postgresql://taskscheduler:taskscheduler@localhost:5432/taskscheduler
+# ============================================================
+# Odyssey Scheduler — Docker Compose (self-contained, SQLite)
+# Usage: docker compose up --build
+# The SQLite database persists in the named volume `odyssey-data`.
+# ============================================================
 
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: task-scheduler-db
-    environment:
-      POSTGRES_USER: taskscheduler
-      POSTGRES_PASSWORD: taskscheduler
-      POSTGRES_DB: taskscheduler
+  app:
+    build: .
+    container_name: odyssey-scheduler
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: "file:/data/odyssey.db"
+      APP_TIMEZONE: "Africa/Lagos"
+      TASK_REMINDER_INTERVAL_MINUTES: "30"
+      ULTR_INSTANCE_ID: "${ULTR_INSTANCE_ID}"
+      ULTRA_TOKEN: "${ULTRA_TOKEN}"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskscheduler"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - odyssey-data:/data
 
 volumes:
-  pgdata:
+  odyssey-data:

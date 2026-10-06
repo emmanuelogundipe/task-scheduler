@@ -1,32 +1,43 @@
+// ============================================================
+// Authentication — bcrypt password hashing + secure httpOnly
+// cookie sessions backed by the database. No external identity
+// providers of any kind.
+// ============================================================
+
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { prisma } from './prisma';
 
-const COOKIE_NAME = 'ts_session';
+const COOKIE_NAME = 'odyssey_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-export async function createSession(adminId: number) {
+export { hashPasscode, verifyPasscode, checkCredentials } from './passwords';
+
+export async function createSession(userId: number) {
   const token = crypto.randomBytes(32).toString('hex');
   await prisma.session.create({
-    data: { token, adminId, expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
+    data: { token, userId, expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
   });
   cookies().set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: SESSION_TTL_MS / 1000,
   });
+  return token;
 }
 
-export async function getSessionAdmin() {
+export async function getSessionUser() {
   const token = cookies().get(COOKIE_NAME)?.value;
   if (!token) return null;
   const session = await prisma.session.findUnique({
     where: { token },
-    include: { admin: true },
+    include: { user: true },
   });
   if (!session || session.expiresAt < new Date()) return null;
-  return session.admin;
+  if (session.user.status !== 'ACTIVE') return null;
+  return session.user;
 }
 
 export async function destroySession() {

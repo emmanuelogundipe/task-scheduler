@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply min-h-screen;
+    @apply min-h-screen bg-slate-950 text-slate-100;
   }
 }
 
@@ -16,12 +16,18 @@
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition hover:bg-red-500/20 disabled:opacity-50;
   }
   .card {
     @apply rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg shadow-black/20;
   }
   .label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold;
   }
 }

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
   const router = useRouter();
+  const [whatsapp, setWhatsapp] = useState('+2348133226669');
   const [passcode, setPasscode] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +19,7 @@ export default function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode, whatsapp }),
+        body: JSON.stringify({ whatsapp, passcode }),
       });
       const data = await res.json();
 
@@ -41,12 +41,12 @@ export default function LoginForm() {
       <div>
         <h2 className="text-lg font-semibold">Admin Login</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Verify your credentials to open the dashboard.
+          Sign in with your administrator WhatsApp number and passcode.
         </p>
       </div>
 
       <div>
-        <label htmlFor="whatsapp" className="label">WhatsApp Number</label>
+        <label htmlFor="whatsapp" className="label">Admin WhatsApp Number</label>
         <input
           id="whatsapp"
           type="tel"
@@ -80,7 +80,7 @@ export default function LoginForm() {
       )}
 
       <button type="submit" className="btn-primary w-full" disabled={loading}>
-        {loading ? 'Verifying…' : 'Sign In to Dashboard'}
+        {loading ? 'Signing in…' : 'Sign in to Dashboard'}
       </button>
     </form>
   );

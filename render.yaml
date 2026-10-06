@@ -1,33 +1,39 @@
-# Render Blueprint — In-Office Task Scheduler & Automated Reminder System
-# 100% FREE: Render free tier + Render PostgreSQL free tier + UltraMsg free tier
-# WhatsApp-only setup: email (SMTP) and Google Calendar env vars are no longer
-# required in the Blueprint. Add them later via the Render dashboard if needed.
+# Render Blueprint — Odyssey Scheduler
+# SQLite keeps the app standalone. A persistent disk is required so
+# the database survives restarts/redeploys (disks require a paid plan;
+# on the free tier the DB resets whenever the service restarts).
+#
+# The long-running node-cron engine starts automatically with the
+# server. On the free tier (which spins down when idle), either keep
+# the service awake with an uptime monitor hitting /api/health every
+# few minutes, or set CRON_SECRET and schedule an external cron to
+# call /api/cron/run every minute.
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
   - type: web
-    name: task-scheduler
+    name: odyssey-scheduler
     runtime: node
-    plan: free
-    buildCommand: npm install && npm run build && npx prisma db push && npx prisma db seed
+    plan: starter
+    buildCommand: npm install && npx prisma migrate deploy && npx prisma generate && npm run build && npx prisma db seed
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: task-scheduler-db
-          property: connectionString
-      - key: ULTRA_INSTANCE_ID
+        value: file:/var/data/odyssey.db
+      - key: APP_TIMEZONE
+        value: Africa/Lagos
+      - key: TASK_REMINDER_INTERVAL_MINUTES
+        value: "30"
+      - key: ULTR_INSTANCE_ID
         sync: false
       - key: ULTRA_TOKEN
         sync: false
-      - key: REMINDER_INTERVAL_MIN
-        value: "30"
-
-databases:
-  - name: task-scheduler-db
-    plan: free
-    databaseName: taskscheduler
-    user: taskscheduler
+      - key: CRON_SECRET
+        generateValue: true
+    disk:
+      name: odyssey-data
+      mountPath: /var/data
+      sizeGB: 1
