@@ -16,7 +16,9 @@ services:
     name: odyssey-scheduler
     runtime: node
     plan: free
-    buildCommand: npm install && npx prisma generate && npx prisma db push --skip-generate && npm run build && npx prisma db seed
+    # --include=dev is required: NODE_ENV=production would otherwise make
+    # npm skip devDependencies (prisma CLI, tsx, typescript, tailwind).
+    buildCommand: npm install --include=dev && npx prisma generate && npx prisma db push --skip-generate && npm run build && npx prisma db seed
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
