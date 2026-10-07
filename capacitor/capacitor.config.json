@@ -1,0 +1,13 @@
+{
+  "appId": "com.odyssey.scheduler",
+  "appName": "Odyssey Scheduler",
+  "webDir": "www",
+  "server": {
+    "url": "https://odyssey-scheduler.onrender.com",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
