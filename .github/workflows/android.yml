@@ -34,8 +34,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The ubuntu-latest runner already has the Android SDK installed
+      # (ANDROID_HOME=/usr/local/lib/android/sdk). Just accept licenses.
+      - name: Accept Android SDK licenses
+        run: |
+          SDKMGR=$(find "${ANDROID_HOME}" -name sdkmanager -type f 2>/dev/null | head -n1)
+          if [ -n "$SDKMGR" ]; then yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true; fi
 
       - name: Install dependencies
         run: npm install
