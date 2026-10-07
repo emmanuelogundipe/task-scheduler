@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+
+# Generated native platforms (created in CI by `npx cap add android`)
+android/
+ios/
+
+# Build output
+dist/
+www/build/

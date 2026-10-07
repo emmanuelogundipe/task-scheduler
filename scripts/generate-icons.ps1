@@ -73,4 +73,11 @@ New-OdysseyIcon -Size 192 -OutPath (Join-Path $outDir "icon-maskable-192.png")  
 New-OdysseyIcon -Size 512 -OutPath (Join-Path $outDir "icon-maskable-512.png")   -Maskable $true
 New-OdysseyIcon -Size 180 -OutPath (Join-Path $publicDir "apple-touch-icon.png") -Maskable $true
 New-OdysseyIcon -Size 32  -OutPath (Join-Path $publicDir "favicon-32.png")       -Maskable $false
+
+# Capacitor native resources (used by @capacitor/assets to build the
+# Android launcher icon and splash screen).
+$capRes = Join-Path $PSScriptRoot "..\capacitor\resources"
+New-Item -ItemType Directory -Force -Path $capRes | Out-Null
+New-OdysseyIcon -Size 1024 -OutPath (Join-Path $capRes "icon.png")   -Maskable $true
+New-OdysseyIcon -Size 2732 -OutPath (Join-Path $capRes "splash.png") -Maskable $true
 Write-Host "Done."

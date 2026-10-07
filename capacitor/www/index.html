@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Odyssey Scheduler</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #020617; color: #e2e8f0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .wrap { height: 100%; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 14px; }
+      .logo { width: 72px; height: 72px; border-radius: 20px; background: #059669;
+        display: flex; align-items: center; justify-content: center; font-size: 36px; }
+      p { color: #94a3b8; font-size: 14px; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="logo">🧭</div>
+      <p>Loading Odyssey Scheduler…</p>
+    </div>
+    <script>
+      // If the live site cannot be reached, send the user there directly.
+      setTimeout(function () {
+        if (document.visibilityState === 'visible' && !window.location.href.includes('onrender')) {
+          window.location.href = 'https://odyssey-scheduler.onrender.com';
+        }
+      }, 4000);
+    </script>
+  </body>
+</html>
