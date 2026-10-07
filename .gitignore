@@ -34,3 +34,6 @@ next-env.d.ts
 
 # local postgres data
 /pgdata/
+
+# local build artifacts
+/dist/

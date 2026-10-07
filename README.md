@@ -267,22 +267,40 @@ No Google or email account is needed at any point.
 
 ---
 
-## 📲 Installing as an App (PWA)
+## 📱 Apps & Installation (Android APK, iPad/iPhone, Desktop PWA)
 
-Odyssey Scheduler is an installable Progressive Web App. Install it from the
-browser on any device — no app store required.
+Odyssey Scheduler can be installed in three ways.
 
-**Android (Chrome):** open the site → tap the **Install** banner, or ⋮ menu →
-**Add to Home screen**.
+### 1. Android — native APK
 
-**iPhone / iPad (Safari):** open the site → **Share** → **Add to Home Screen**.
+A prebuilt, directly-installable APK is attached to the GitHub **release `v1.0.0`**
+(`odyssey-scheduler.apk`, ~5 MB). It wraps the live deployment in a native webview,
+so it always runs the newest version without reinstalling.
 
-**Windows / macOS / Linux (Chrome/Edge):** click the **install** icon in the
-address bar, or the **Install** banner.
+**Install:** download the APK → open it → allow installation from this source →
+install → open **Odyssey Scheduler**.
+
+**Rebuild it:** the workflow `.github/workflows/android.yml` builds the APK in the
+cloud (no Android SDK needed locally). Go to the **Actions** tab → *Build Android
+APK* → *Run workflow*, then download the artifact. The Capacitor project lives in
+`capacitor/` (its `server.url` points at the live deployment).
+
+### 2. iPad / iPhone — Home Screen app (PWA)
+
+An APK cannot be installed on iOS. Instead: open the site in **Safari** →
+**Share** → **Add to Home Screen**. It installs full-screen with the Odyssey icon.
+(A true App Store build requires a Mac with Xcode and an Apple Developer account.)
+
+### 3. Desktop & any browser — installable PWA
+
+Open the site and tap the **Install** banner (or the install icon in the address
+bar on Chrome/Edge). It opens in its own app window.
+
+**Android (Chrome):** **Install** banner, or ⋮ → **Add to Home screen**.
+**Windows / macOS / Linux (Chrome/Edge):** install icon in the address bar.
 
 Once installed it opens in its own full-screen window with the Odyssey icon, a
-splash screen, and an offline notice if the connection drops. Tasks, approvals
-and WhatsApp reminders all continue to work exactly as before.
+splash screen, and an offline notice if the connection drops.
 
 - **Manifest:** `/manifest.webmanifest` (`src/app/manifest.ts`)
 - **Service worker:** `/sw.js` (static asset caching + offline page)
