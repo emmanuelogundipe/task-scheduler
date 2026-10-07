@@ -21,11 +21,9 @@ export interface TaskRow {
   deadlineTimeLabel: string;
   timeRemaining: string;
   overdue: boolean;
-  lastReminderAt: string | null;
   completedAt: string | null;
   approvedAt: string | null;
-  milestone50Sent: boolean;
-  milestone70Sent: boolean;
+  dayBeforeReminderSent: boolean;
   deadlineNotificationSent: boolean;
 }
 
@@ -97,7 +95,6 @@ export default function TaskTable({
               <th className="px-4 py-3">Time Remaining</th>
               <th className="px-4 py-3">Progress</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Last Reminder</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -132,11 +129,6 @@ export default function TaskTable({
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={task.status} label={task.statusLabel} />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
-                    {task.lastReminderAt
-                      ? new Date(task.lastReminderAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })
-                      : '—'}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex justify-end gap-1.5">

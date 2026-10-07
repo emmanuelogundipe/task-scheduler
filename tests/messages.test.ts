@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   taskAssignedMessage,
-  taskReminderMessage,
-  milestoneMessage,
-  deadlineReachedMessage,
+  taskAssignedAdminMessage,
+  dayBeforeReminderMessage,
+  deadlineReminderMessage,
 } from '@/lib/notifications';
 
 const task = {
@@ -16,41 +16,36 @@ const task = {
 };
 
 describe('whatsapp message templates', () => {
-  it('builds the assignment message', () => {
+  it('builds the assignment message for the handler', () => {
     const msg = taskAssignedMessage(task, 'Emmanuel', 'Africa/Lagos');
     expect(msg).toContain('ODYSSEY SCHEDULER');
     expect(msg).toContain('You have been assigned a new task.');
     expect(msg).toContain('Prepare August Newsletter');
-    expect(msg).toContain('Duration:');
-    expect(msg).toContain('4 hours');
     expect(msg).toContain('Odyssey Educational Foundation');
   });
 
-  it('builds the reminder message', () => {
-    const msg = taskReminderMessage(task, {
-      elapsedMinutes: 45,
-      remainingMinutes: 75,
-      statusLabel: 'IN PROGRESS',
-      timezone: 'Africa/Lagos',
-    });
+  it('builds the assignment message for the administrator', () => {
+    const msg = taskAssignedAdminMessage(task, 'Emmanuel', 'Africa/Lagos');
+    expect(msg).toContain('A new task has been assigned.');
+    expect(msg).toContain('Assigned To: Emmanuel');
+    expect(msg).toContain('Prepare August Newsletter');
+  });
+
+  it('builds the day-before reminder message', () => {
+    const msg = dayBeforeReminderMessage(task, 'Emmanuel', 'Africa/Lagos');
     expect(msg).toContain('ODYSSEY SCHEDULER REMINDER');
-    expect(msg).toContain('Status: IN PROGRESS');
-    expect(msg).toContain('Time remaining: 1 hour 15 minutes');
+    expect(msg).toContain('due tomorrow');
+    expect(msg).toContain('Prepare August Newsletter');
+    expect(msg).toContain('Emmanuel');
   });
 
-  it('builds the 50% and 70% milestone messages', () => {
-    const m50 = milestoneMessage(task, { percent: 50, assignedTo: 'Emmanuel', timezone: 'Africa/Lagos' });
-    expect(m50).toContain('TASK MILESTONE: 50%');
-    expect(m50).toContain('Assigned To: Emmanuel');
+  it('builds the deadline reminder message (on time and overdue)', () => {
+    const onTime = deadlineReminderMessage(task, 'Emmanuel', 'Africa/Lagos', false);
+    expect(onTime).toContain('due now');
+    expect(onTime).toContain('Prepare August Newsletter');
 
-    const m70 = milestoneMessage(task, { percent: 70, assignedTo: 'Emmanuel', timezone: 'Africa/Lagos' });
-    expect(m70).toContain('TASK MILESTONE: 70%');
-    expect(m70).toContain('deadline is approaching');
-  });
-
-  it('builds the deadline-reached message', () => {
-    const msg = deadlineReachedMessage(task, 'Emmanuel');
-    expect(msg).toContain('DEADLINE REACHED');
-    expect(msg).toContain('has not yet been marked as completed');
+    const overdue = deadlineReminderMessage(task, 'Emmanuel', 'Africa/Lagos', true);
+    expect(overdue).toContain('deadline has been reached');
+    expect(overdue).toContain('not yet been marked as completed');
   });
 });

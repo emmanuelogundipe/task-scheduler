@@ -41,8 +41,7 @@ export interface SerializedTask {
   completedAt: string | null;
   approvedAt: string | null;
   approvedById: number | null;
-  milestone50Sent: boolean;
-  milestone70Sent: boolean;
+  dayBeforeReminderSent: boolean;
   deadlineNotificationSent: boolean;
   createdAt: string;
 }
@@ -88,8 +87,7 @@ export function serializeTask(task: any, now: Date = new Date(), timezone = APP_
     completedAt: task.completedAt ? new Date(task.completedAt).toISOString() : null,
     approvedAt: task.approvedAt ? new Date(task.approvedAt).toISOString() : null,
     approvedById: task.approvedById ?? null,
-    milestone50Sent: task.milestone50Sent,
-    milestone70Sent: task.milestone70Sent,
+    dayBeforeReminderSent: task.dayBeforeReminderSent,
     deadlineNotificationSent: task.deadlineNotificationSent,
     createdAt: new Date(task.createdAt).toISOString(),
   };

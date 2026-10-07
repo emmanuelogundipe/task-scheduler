@@ -2,15 +2,19 @@
 // Background Task Reminder Engine
 //
 // Runs every minute from the server process (node-cron), fully
-// independent of the browser. For every active task it:
-//   1. Persists the current progress percentage
-//   2. At 5 fixed intervals before completion it reminds BOTH handler + admin equally
-//   3. Alerts handler + admin exactly once at 50% and 70% elapsed
-//   4. Alerts handler + admin exactly once when the deadline is reached
+// independent of the browser.
 //
-// Duplicate protection is database-backed (milestone flags /
-// remindersSent), so restarting the server never resends a
-// notification. Completed and cancelled tasks are ignored.
+// Exactly THREE automated notifications are sent per task, each
+// delivered to BOTH the assigned task handler and the administrator:
+//
+//   1. On assignment      — when the task is created (immediate)
+//   2. One day before     — ~24h before the deadline
+//                           (skipped if the task is shorter than 24h)
+//   3. On the deadline    — when the deadline is reached
+//
+// Duplicate protection is database-backed (flags on the task row),
+// so restarting the server never resends a notification. Completed
+// and cancelled tasks are ignored entirely.
 //
 // The per-task decision logic lives in the pure `planTaskActions`
 // function so it can be unit-tested without a database.
@@ -20,13 +24,17 @@ import cron from 'node-cron';
 import { prisma } from './prisma';
 import {
   sendAndLog,
-  taskReminderMessage,
-  milestoneMessage,
-  deadlineReachedMessage,
+  dayBeforeReminderMessage,
+  deadlineReminderMessage,
 } from './notifications';
 import { progressPercentage, elapsedFraction } from './time';
 
 let started = false;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// A task is "long enough" to warrant the day-before reminder only if
+// its full duration spans at least a day (minus a small tolerance).
+const LONG_TASK_THRESHOLD_MS = DAY_MS - 5 * 60 * 1000;
 
 export function startScheduler() {
   if (started) return;
@@ -52,26 +60,15 @@ export interface PlanTask {
   startDateTime: Date;
   deadlineDateTime: Date;
   durationMinutes: number;
-  milestone50Sent: boolean;
-  milestone70Sent: boolean;
+  dayBeforeReminderSent: boolean;
   deadlineNotificationSent: boolean;
-  lastReminderAt: Date | null;
-  remindersSent: number;
 }
-
-/**
- * The 5 reminder intervals before a task completes, measured as the
- * fraction of its duration already elapsed. Each interval fires at most
- * once, and every fire is delivered to BOTH the admin and the task
- * handler equally.
- */
-export const REMINDER_STAGES: number[] = [0.2, 0.4, 0.6, 0.8, 0.95];
 
 export interface SchedulerDecision {
   progress: number;
-  sendReminder: boolean;
-  sendMilestone50: boolean;
-  sendMilestone70: boolean;
+  /** Reminder #2 — one day before the deadline (long tasks only). */
+  sendDayBefore: boolean;
+  /** Reminder #3 — on the deadline. */
   sendDeadline: boolean;
   markOverdue: boolean;
 }
@@ -80,37 +77,58 @@ export interface SchedulerDecision {
  * Pure decision function — no IO. Given a task and the current
  * time, decide what (if anything) the scheduler should do.
  */
-export function planTaskActions(
-  task: PlanTask,
-  now: Date,
-  intervalMinutes: number
-): SchedulerDecision {
+export function planTaskActions(task: PlanTask, now: Date): SchedulerDecision {
   const active = task.status === 'IN_PROGRESS' || task.status === 'OVERDUE';
   const progress = progressPercentage(task.startDateTime, task.durationMinutes, now);
-  const fraction = elapsedFraction(task.startDateTime, task.durationMinutes, now);
-  const beforeDeadline = now.getTime() < task.deadlineDateTime.getTime();
-  const started = now.getTime() >= task.startDateTime.getTime();
+  const deadlineMs = task.deadlineDateTime.getTime();
+  const nowMs = now.getTime();
+  const beforeDeadline = nowMs < deadlineMs;
 
-  const reminderDue = (() => {
-    if (!active || !started || !beforeDeadline) return false;
-    const desiredCount = REMINDER_STAGES.filter((stage) => fraction >= stage).length;
-    return desiredCount > (task.remindersSent ?? 0);
-  })();
+  const durationMs = Math.max(0, deadlineMs - task.startDateTime.getTime());
+  const isLongTask = durationMs >= LONG_TASK_THRESHOLD_MS;
+  // The day-before reminder is due once we are within 24h of the deadline.
+  const dayBeforeDue = nowMs >= deadlineMs - DAY_MS;
 
   return {
     progress,
-    sendReminder: reminderDue,
-    sendMilestone50: active && beforeDeadline && fraction >= 0.5 && !task.milestone50Sent,
-    sendMilestone70: active && beforeDeadline && fraction >= 0.7 && !task.milestone70Sent,
+    // Reminder #2: only for long tasks, once, and only before the deadline.
+    sendDayBefore:
+      active && isLongTask && beforeDeadline && dayBeforeDue && !task.dayBeforeReminderSent,
+    // Reminder #3: once, at/after the deadline.
     sendDeadline: active && !beforeDeadline && !task.deadlineNotificationSent,
     markOverdue: active && !beforeDeadline && task.status === 'IN_PROGRESS',
   };
 }
 
-/** How many of the 5 pre-deadline reminder intervals are now due. */
-export function desiredReminderCount(task: PlanTask, now: Date): number {
-  const fraction = elapsedFraction(task.startDateTime, task.durationMinutes, now);
-  return REMINDER_STAGES.filter((stage) => fraction >= stage).length;
+/** Send a single message to both the handler and the admin. */
+async function sendToBoth(opts: {
+  task: any;
+  adminId: number | null;
+  adminWhatsapp: string;
+  type: 'DAY_BEFORE_REMINDER' | 'DEADLINE_REMINDER';
+  build: (handlerName: string) => string;
+  timezone: string;
+}) {
+  const { task } = opts;
+  const message = opts.build(task.assignedTo.name);
+
+  await sendAndLog({
+    taskId: task.id,
+    recipientUserId: task.assignedToId,
+    type: opts.type,
+    to: task.assignedTo.whatsappNumber,
+    message,
+    timezone: opts.timezone,
+  });
+
+  await sendAndLog({
+    taskId: task.id,
+    recipientUserId: opts.adminId,
+    type: opts.type,
+    to: opts.adminWhatsapp,
+    message,
+    timezone: opts.timezone,
+  });
 }
 
 /** Exposed for tests / manual runs. Runs a single scheduler pass. */
@@ -119,7 +137,6 @@ export async function runSchedulerCycle(now: Date = new Date()): Promise<void> {
   if (!settings) return;
 
   const timezone = settings.timezone || 'Africa/Lagos';
-  const intervalMin = Math.max(1, settings.reminderIntervalMinutes || 30);
 
   const admin = await prisma.user.findFirst({ where: { role: 'ADMIN', status: 'ACTIVE' } });
 
@@ -129,7 +146,7 @@ export async function runSchedulerCycle(now: Date = new Date()): Promise<void> {
   });
 
   for (const task of tasks) {
-    const decision = planTaskActions(task, now, intervalMin);
+    const decision = planTaskActions(task, now);
 
     // ---- 0. Persist computed progress ----
     if (task.progressPercentage !== decision.progress) {
@@ -139,61 +156,33 @@ export async function runSchedulerCycle(now: Date = new Date()): Promise<void> {
       });
     }
 
-    // ---- 1. Pre-deadline interval reminder — identical for admin + handler ----
-    if (decision.sendReminder) {
-      const elapsedMinutes = Math.max(0, (now.getTime() - task.startDateTime.getTime()) / 60000);
-      const remainingMinutes = Math.max(0, (task.deadlineDateTime.getTime() - now.getTime()) / 60000);
-      const message = taskReminderMessage(task, {
-        elapsedMinutes: Math.floor(elapsedMinutes),
-        remainingMinutes: Math.ceil(remainingMinutes),
-        statusLabel: 'IN PROGRESS',
+    // ---- Reminder #2: one day before the deadline ----
+    if (decision.sendDayBefore) {
+      await sendToBoth({
+        task,
+        adminId: admin?.id ?? null,
+        adminWhatsapp: settings.adminWhatsapp,
+        type: 'DAY_BEFORE_REMINDER',
         timezone,
+        build: (handlerName) => dayBeforeReminderMessage(task, handlerName, timezone),
       });
-      // Equal reminders: the handler and the admin get the same notification.
-      await sendAndLog({
-        taskId: task.id,
-        recipientUserId: task.assignedToId,
-        type: 'TASK_REMINDER',
-        to: task.assignedTo.whatsappNumber,
-        message,
-        timezone,
-      });
-      if (settings.adminWhatsapp) {
-        await sendAndLog({
-          taskId: task.id,
-          recipientUserId: admin?.id ?? null,
-          type: 'TASK_REMINDER',
-          to: settings.adminWhatsapp,
-          message,
-          timezone,
-        });
-      }
       await prisma.task.update({
         where: { id: task.id },
-        data: { lastReminderAt: now, remindersSent: Math.max(task.remindersSent ?? 0, desiredReminderCount(task, now)) },
+        data: { dayBeforeReminderSent: true },
       });
     }
 
-    // ---- 2. Milestone alerts — equal to admin AND handler ----
-    if (decision.sendMilestone50) {
-      const msg50 = milestoneMessage(task, { percent: 50, assignedTo: task.assignedTo.name, timezone });
-      await sendAndLog({ taskId: task.id, recipientUserId: admin?.id ?? null, type: 'MILESTONE_50', to: settings.adminWhatsapp, message: msg50, timezone });
-      await sendAndLog({ taskId: task.id, recipientUserId: task.assignedToId, type: 'MILESTONE_50', to: task.assignedTo.whatsappNumber, message: msg50, timezone });
-      await prisma.task.update({ where: { id: task.id }, data: { milestone50Sent: true } });
-    }
-
-    if (decision.sendMilestone70) {
-      const msg70 = milestoneMessage(task, { percent: 70, assignedTo: task.assignedTo.name, timezone });
-      await sendAndLog({ taskId: task.id, recipientUserId: admin?.id ?? null, type: 'MILESTONE_70', to: settings.adminWhatsapp, message: msg70, timezone });
-      await sendAndLog({ taskId: task.id, recipientUserId: task.assignedToId, type: 'MILESTONE_70', to: task.assignedTo.whatsappNumber, message: msg70, timezone });
-      await prisma.task.update({ where: { id: task.id }, data: { milestone70Sent: true } });
-    }
-
-    // ---- 3. Deadline reached (once) — equal to admin AND handler ----
+    // ---- Reminder #3: on the deadline ----
     if (decision.sendDeadline) {
-      const msgDeadline = deadlineReachedMessage(task, task.assignedTo.name);
-      await sendAndLog({ taskId: task.id, recipientUserId: admin?.id ?? null, type: 'DEADLINE_REACHED', to: settings.adminWhatsapp, message: msgDeadline, timezone });
-      await sendAndLog({ taskId: task.id, recipientUserId: task.assignedToId, type: 'DEADLINE_REACHED', to: task.assignedTo.whatsappNumber, message: msgDeadline, timezone });
+      const overdue = now.getTime() > task.deadlineDateTime.getTime();
+      await sendToBoth({
+        task,
+        adminId: admin?.id ?? null,
+        adminWhatsapp: settings.adminWhatsapp,
+        type: 'DEADLINE_REMINDER',
+        timezone,
+        build: (handlerName) => deadlineReminderMessage(task, handlerName, timezone, overdue),
+      });
       await prisma.task.update({
         where: { id: task.id },
         data: {

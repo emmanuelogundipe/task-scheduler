@@ -73,10 +73,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           approvedById: user.id,
           completedAt: existing.completedAt ?? now,
           progressPercentage: 100,
-          // Ensure all future automated reminders are permanently stopped.
+          // Ensure no further automated reminders are sent.
+          dayBeforeReminderSent: true,
           deadlineNotificationSent: true,
-          milestone50Sent: true,
-          milestone70Sent: true,
         },
         include: { assignedTo: true, approvedBy: true },
       });
@@ -97,9 +96,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         where: { id },
         data: {
           status: 'CANCELLED',
+          dayBeforeReminderSent: true,
           deadlineNotificationSent: true,
-          milestone50Sent: true,
-          milestone70Sent: true,
         },
         include: { assignedTo: true },
       });

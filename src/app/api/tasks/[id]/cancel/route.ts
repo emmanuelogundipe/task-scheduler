@@ -21,9 +21,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     where: { id },
     data: {
       status: 'CANCELLED',
+      dayBeforeReminderSent: true,
       deadlineNotificationSent: true,
-      milestone50Sent: true,
-      milestone70Sent: true,
     },
     include: { assignedTo: true },
   });

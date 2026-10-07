@@ -84,6 +84,7 @@ model Task {
 
   milestone50Sent       Boolean   @default(false)
   milestone70Sent       Boolean   @default(false)
+  dayBeforeReminderSent Boolean   @default(false)
   deadlineNotificationSent Boolean @default(false)
   lastReminderAt        DateTime?
   // How many of the 5 pre-deadline reminder intervals have already

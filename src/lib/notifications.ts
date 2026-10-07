@@ -11,6 +11,8 @@ import { logAudit } from './audit';
 export type NotificationType =
   | 'TASK_ASSIGNED'
   | 'TASK_REMINDER'
+  | 'DAY_BEFORE_REMINDER'
+  | 'DEADLINE_REMINDER'
   | 'MILESTONE_50'
   | 'MILESTONE_70'
   | 'DEADLINE_REACHED'
@@ -104,63 +106,70 @@ export function taskAssignedMessage(task: TaskLike, handlerName: string, timezon
   ].join('\n');
 }
 
-export function taskReminderMessage(
+/** Assignment notice sent to the administrator (a copy of #1). */
+export function taskAssignedAdminMessage(task: TaskLike, handlerName: string, timezone: string): string {
+  return [
+    'ODYSSEY SCHEDULER',
+    '',
+    'A new task has been assigned.',
+    '',
+    `Task: ${task.title}`,
+    '',
+    `Assigned To: ${handlerName}`,
+    '',
+    'Start:',
+    formatTime(task.startDateTime, timezone),
+    '',
+    'Deadline:',
+    formatTime(task.deadlineDateTime, timezone),
+    '',
+    'Duration:',
+    humanizeMinutes(task.durationMinutes),
+  ].join('\n');
+}
+
+/** Reminder #2 — sent the day before the deadline (to handler and admin). */
+export function dayBeforeReminderMessage(
   task: TaskLike,
-  opts: { elapsedMinutes: number; remainingMinutes: number; statusLabel: string; timezone: string }
+  handlerName: string,
+  timezone: string
 ): string {
   return [
     'ODYSSEY SCHEDULER REMINDER',
     '',
+    'This task is due tomorrow.',
+    '',
     `Task: ${task.title}`,
     '',
-    `Status: ${opts.statusLabel}`,
+    `Assigned To: ${handlerName}`,
     '',
-    `Time elapsed: ${humanizeMinutes(opts.elapsedMinutes)}`,
+    `Deadline: ${formatDateTime(task.deadlineDateTime, timezone)}`,
     '',
-    `Time remaining: ${humanizeMinutes(opts.remainingMinutes)}`,
-    '',
-    `Deadline: ${formatTime(task.deadlineDateTime, opts.timezone)}`,
-    '',
-    'Please continue working on the task and ensure it is completed before the deadline.',
+    'Please ensure it is completed before the deadline.',
   ].join('\n');
 }
 
-export function milestoneMessage(
+/** Reminder #3 — sent on the deadline (to handler and admin). */
+export function deadlineReminderMessage(
   task: TaskLike,
-  opts: { percent: 50 | 70; assignedTo: string; timezone: string }
+  handlerName: string,
+  timezone: string,
+  overdue: boolean
 ): string {
-  const lines = [
-    'ODYSSEY SCHEDULER',
-    '',
-    `TASK MILESTONE: ${opts.percent}%`,
-    '',
-    `Task: ${task.title}`,
-    '',
-    `Assigned To: ${opts.assignedTo}`,
-    '',
-    `${opts.percent}% of the allocated task duration has elapsed.`,
-  ];
-  if (opts.percent === 70) {
-    lines.push('', 'The task deadline is approaching.');
-  } else {
-    lines.push('', `Deadline: ${formatTime(task.deadlineDateTime, opts.timezone)}`);
-  }
-  return lines.join('\n');
-}
-
-export function deadlineReachedMessage(task: TaskLike, assignedTo: string): string {
   return [
-    'ODYSSEY SCHEDULER',
+    'ODYSSEY SCHEDULER REMINDER',
     '',
-    'DEADLINE REACHED',
+    overdue ? 'The task deadline has been reached.' : 'This task is due now.',
     '',
     `Task: ${task.title}`,
     '',
-    `Assigned To: ${assignedTo}`,
+    `Assigned To: ${handlerName}`,
     '',
-    'The task has reached its deadline and has not yet been marked as completed.',
+    `Deadline: ${formatDateTime(task.deadlineDateTime, timezone)}`,
     '',
-    'Please review the task.',
+    overdue
+      ? 'The task has not yet been marked as completed. Please review it as soon as possible.'
+      : 'Please complete the task now.',
   ].join('\n');
 }
 

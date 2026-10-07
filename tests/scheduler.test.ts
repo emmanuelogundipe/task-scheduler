@@ -1,110 +1,95 @@
 import { describe, it, expect } from 'vitest';
 import { planTaskActions, type PlanTask } from '@/lib/scheduler';
 
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 const NOW = new Date('2026-08-10T12:00:00Z');
 
 function makeTask(overrides: Partial<PlanTask> = {}): PlanTask {
   return {
     status: 'IN_PROGRESS',
-    startDateTime: new Date(NOW.getTime() - 60 * 60000), // started 60 min ago
-    deadlineDateTime: new Date(NOW.getTime() + 60 * 60000), // ends in 60 min
-    durationMinutes: 120, // 50% elapsed at NOW
-    milestone50Sent: false,
-    milestone70Sent: false,
+    startDateTime: new Date(NOW.getTime() - 10 * DAY), // started long ago
+    deadlineDateTime: new Date(NOW.getTime() + 3 * DAY), // 3 days out
+    durationMinutes: 13 * 24 * 60,
+    dayBeforeReminderSent: false,
     deadlineNotificationSent: false,
-    lastReminderAt: NOW,
-    remindersSent: 0,
     ...overrides,
   };
 }
 
-describe('scheduler planning + duplicate protection', () => {
-  it('sends the 50% milestone exactly once', () => {
-    const task = makeTask();
-    const first = planTaskActions(task, NOW, 30);
-    expect(first.sendMilestone50).toBe(true);
-    expect(first.sendMilestone70).toBe(false);
-    expect(first.progress).toBe(50);
-
-    // Simulate the flag having been persisted after the first send.
-    const second = planTaskActions({ ...task, milestone50Sent: true }, NOW, 30);
-    expect(second.sendMilestone50).toBe(false);
+describe('scheduler — three-reminder engine', () => {
+  it('does not send the day-before reminder too early', () => {
+    const task = makeTask(); // deadline 3 days away
+    const d = planTaskActions(task, NOW);
+    expect(d.sendDayBefore).toBe(false);
+    expect(d.sendDeadline).toBe(false);
   });
 
-  it('sends the 70% milestone exactly once', () => {
-    const task = makeTask({ startDateTime: new Date(NOW.getTime() - 84 * 60000) }); // 70%
-    const first = planTaskActions(task, NOW, 30);
-    expect(first.sendMilestone50).toBe(true);
-    expect(first.sendMilestone70).toBe(true);
+  it('sends the day-before reminder once within 24h of the deadline', () => {
+    const task = makeTask({ deadlineDateTime: new Date(NOW.getTime() + 12 * HOUR) });
+    const first = planTaskActions(task, NOW);
+    expect(first.sendDayBefore).toBe(true);
 
-    const after = planTaskActions(
-      { ...task, milestone50Sent: true, milestone70Sent: true },
-      NOW,
-      30
-    );
-    expect(after.sendMilestone50).toBe(false);
-    expect(after.sendMilestone70).toBe(false);
+    // Once the flag is persisted, it never fires again.
+    const second = planTaskActions({ ...task, dayBeforeReminderSent: true }, NOW);
+    expect(second.sendDayBefore).toBe(false);
   });
 
-  it('sends the deadline notification exactly once after the deadline', () => {
+  it('skips the day-before reminder for tasks shorter than 24h', () => {
     const task = makeTask({
-      startDateTime: new Date(NOW.getTime() - 180 * 60000),
-      deadlineDateTime: new Date(NOW.getTime() - 30 * 60000),
-      durationMinutes: 150,
-      milestone50Sent: true,
-      milestone70Sent: true,
+      startDateTime: new Date(NOW.getTime() - 1 * HOUR),
+      deadlineDateTime: new Date(NOW.getTime() + 3 * HOUR),
+      durationMinutes: 4 * 60, // 4-hour task
     });
-    const first = planTaskActions(task, NOW, 30);
+    const d = planTaskActions(task, NOW);
+    expect(d.sendDayBefore).toBe(false);
+    expect(d.sendDeadline).toBe(false);
+  });
+
+  it('sends the deadline reminder exactly once', () => {
+    const task = makeTask({
+      startDateTime: new Date(NOW.getTime() - 2 * HOUR),
+      deadlineDateTime: new Date(NOW.getTime() - 30 * 60 * 1000), // 30 min ago
+      durationMinutes: 90,
+    });
+    const first = planTaskActions(task, NOW);
     expect(first.sendDeadline).toBe(true);
     expect(first.markOverdue).toBe(true);
 
-    const second = planTaskActions({ ...task, deadlineNotificationSent: true }, NOW, 30);
+    const second = planTaskActions({ ...task, deadlineNotificationSent: true }, NOW);
     expect(second.sendDeadline).toBe(false);
   });
 
-  it('sends each of the 5 pre-deadline reminders at most once', () => {
-    // Mid-run at 60%: stages 1-3 are due → send.
-    const mid = makeTask({ startDateTime: new Date(NOW.getTime() - 72 * 60000) });
-    expect(planTaskActions(mid, NOW, 30).sendReminder).toBe(true);
-
-    // After stages were logged, no new reminder until another stage is crossed.
-    const logged = makeTask({ startDateTime: new Date(NOW.getTime() - 72 * 60000), remindersSent: 3 });
-    expect(planTaskActions(logged, NOW, 30).sendReminder).toBe(false);
-
-    // Just before completion (95%+) the final stage is due.
-    const nearEnd = makeTask({ startDateTime: new Date(NOW.getTime() - 115 * 60000), remindersSent: 4 });
-    expect(planTaskActions(nearEnd, NOW, 30).sendReminder).toBe(true);
-  });
-
-  it('never sends reminders before the task starts', () => {
-    const future = makeTask({
-      startDateTime: new Date(NOW.getTime() + 30 * 60000),
-      deadlineDateTime: new Date(NOW.getTime() + 90 * 60000),
-      lastReminderAt: null,
-    });
-    expect(planTaskActions(future, NOW, 30).sendReminder).toBe(false);
-  });
-
-  it('stops all notifications for completed/cancelled tasks', () => {
+  it('never notifies completed, cancelled or pending-approval tasks', () => {
     for (const status of ['COMPLETED', 'CANCELLED', 'PENDING_APPROVAL']) {
       const task = makeTask({
         status,
-        deadlineDateTime: new Date(NOW.getTime() - 30 * 60000),
-        lastReminderAt: null,
+        deadlineDateTime: new Date(NOW.getTime() - HOUR),
       });
-      const d = planTaskActions(task, NOW, 30);
-      expect(d.sendReminder).toBe(false);
-      expect(d.sendMilestone50).toBe(false);
-      expect(d.sendMilestone70).toBe(false);
+      const d = planTaskActions(task, NOW);
+      expect(d.sendDayBefore).toBe(false);
       expect(d.sendDeadline).toBe(false);
+      expect(d.markOverdue).toBe(false);
     }
   });
 
   it('recovers across restarts because state lives on the row', () => {
-    // A restarted server re-reads the persisted flags and re-plans.
-    const task = makeTask({ milestone50Sent: true, milestone70Sent: true, lastReminderAt: NOW });
-    const d = planTaskActions(task, NOW, 30);
-    expect(d.sendMilestone50).toBe(false);
-    expect(d.sendMilestone70).toBe(false);
+    const task = makeTask({
+      deadlineDateTime: new Date(NOW.getTime() + 12 * HOUR),
+      dayBeforeReminderSent: true,
+      deadlineNotificationSent: true,
+    });
+    const d = planTaskActions(task, NOW);
+    expect(d.sendDayBefore).toBe(false);
+    expect(d.sendDeadline).toBe(false);
+  });
+
+  it('computes progress percentage', () => {
+    const task = makeTask({
+      startDateTime: new Date(NOW.getTime() - 30 * 60 * 1000),
+      deadlineDateTime: new Date(NOW.getTime() + 30 * 60 * 1000),
+      durationMinutes: 60,
+    });
+    expect(planTaskActions(task, NOW).progress).toBe(50);
   });
 });

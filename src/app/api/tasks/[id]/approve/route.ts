@@ -26,9 +26,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       approvedById: user.id,
       completedAt: existing.completedAt ?? now,
       progressPercentage: 100,
+      // Ensure no further automated reminders are sent.
+      dayBeforeReminderSent: true,
       deadlineNotificationSent: true,
-      milestone50Sent: true,
-      milestone70Sent: true,
     },
     include: { assignedTo: true, approvedBy: true },
   });

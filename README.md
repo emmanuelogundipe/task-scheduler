@@ -22,12 +22,12 @@ Admin → Odyssey Scheduler → UltraMsg → WhatsApp
 - **Local admin authentication** — WhatsApp number + passcode (bcrypt-hashed), secure httpOnly cookie sessions. No external identity provider.
 - **Admin dashboard** — Total, In Progress, Pending Approval, Completed, Overdue, Due Today, Due Soon and Assigned Today statistics, plus active tasks and recent activity.
 - **Unlimited task creation** — assign any number of tasks; duration is auto-calculated from start and deadline.
-- **Instant WhatsApp on assignment** via UltraMsg.
-- **Background reminder engine** (node-cron, every minute) that runs on the server — independent of the browser:
-  - Pre-completion reminders to BOTH the admin and the task handler � one at each of 5 intervals before the task ends.
-  - **50%** and **70%** elapsed milestone alerts to the administrator AND the handler.
-  - **Deadline reached** alert to the administrator AND the handler.
-- **Duplicate protection** — milestone/deadline flags are stored in the database, so notifications are sent **exactly once**, even across server restarts.
+- **Exactly three WhatsApp reminders per task**, each sent to **both** the task handler and the administrator:
+  1. **On assignment** — immediately when the task is created.
+  2. **One day before** the deadline (skipped for tasks shorter than 24 hours).
+  3. **On the deadline**.
+- **Background reminder engine** (node-cron, every minute) that runs on the server — independent of the browser.
+- **Duplicate protection** — reminder flags are stored in the database, so notifications are sent **exactly once**, even across server restarts.
 - **Completion workflow** — In Progress → Pending Approval → Completed. Approving a task permanently stops all its reminders.
 - **Team management** — add, edit, activate/deactivate handlers. Historical tasks are always preserved.
 - **Notification history** — every WhatsApp attempt is logged with delivery status (`SENT` / `FAILED` / `PENDING`), filterable by type and status.
@@ -270,22 +270,22 @@ No Google or email account is needed at any point.
 
 `src/lib/scheduler.ts` runs every minute (node-cron, started by
 `src/instrumentation.ts`). For every task with status **IN_PROGRESS** or
-**OVERDUE** it computes progress from the start time and duration, then:
+**OVERDUE**, exactly **three** automated notifications are sent — always to
+**both** the assigned task handler and the administrator:
 
-1. Sends a **periodic WhatsApp reminder** to the handler every
-   `TASK_REMINDER_INTERVAL_MINUTES` (default 30), at 5 stages before the deadline.
-2. Sends the administrator a **50% milestone** alert once.
-3. Sends the administrator a **70% milestone** alert once.
-4. Sends the administrator a **deadline reached** alert once, and marks the task
-   **OVERDUE**.
+1. **On assignment** — sent immediately when the task is created.
+2. **One day before the deadline** — sent once the task is within 24 hours of its
+   deadline. This is **skipped automatically for tasks shorter than 24 hours**.
+3. **On the deadline** — sent once when the deadline is reached; the task is then
+   marked **OVERDUE**.
 
-Duplicate protection uses the `milestone50Sent`, `milestone70Sent` and
-`deadlineNotificationSent` flags plus `lastReminderAt` on the task row. Because
-this state lives in the database, **restarting the server never resends a
-notification** and the engine resumes monitoring all active tasks automatically.
+Duplicate protection uses the `dayBeforeReminderSent` and
+`deadlineNotificationSent` flags on the task row. Because this state lives in the
+database, **restarting the server never resends a notification** and the engine
+resumes monitoring all active tasks automatically.
 
 Approving a task sets it to **COMPLETED**, which removes it from the scheduler's
-query and permanently stops all reminders, milestones and deadline alerts.
+query and permanently stops all reminders.
 
 ### Progress & time remaining
 

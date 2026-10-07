@@ -115,56 +115,79 @@ async function main() {
   const filtered = await api('/api/tasks?status=IN_PROGRESS&search=Smoke');
   assert(filtered.status === 200 && filtered.data.tasks.length >= 1, 'filter/search works');
 
-  console.log('→ Scheduler: deadline notification (past task, sent once)');
+  console.log('→ Assignment goes to BOTH handler and admin');
   const { runSchedulerCycle } = await import('../src/lib/scheduler');
   const { prisma } = await import('../src/lib/prisma');
+  const assignedLogs = await prisma.notificationLog.findMany({
+    where: { taskId, notificationType: 'TASK_ASSIGNED' },
+  });
+  assert(assignedLogs.length === 2, 'assignment notification logged for handler and admin');
+
+  console.log('→ Scheduler: deadline reminder (past task, sent once to both)');
   await runSchedulerCycle(new Date());
   const afterFirst = await prisma.task.findUnique({ where: { id: taskId } });
   assert(afterFirst?.status === 'OVERDUE', 'overdue task marked OVERDUE');
-  assert(afterFirst?.deadlineNotificationSent === true, 'deadline notification flagged once');
-  assert(afterFirst?.milestone50Sent === false, 'no milestone fired after the deadline');
+  assert(afterFirst?.deadlineNotificationSent === true, 'deadline reminder flagged');
+  const deadlineLogs = await prisma.notificationLog.count({
+    where: { taskId, notificationType: 'DEADLINE_REMINDER' },
+  });
+  assert(deadlineLogs === 2, 'deadline reminder sent to handler and admin');
 
-  console.log('→ Scheduler: in-flight task milestones + reminders');
+  console.log('→ Scheduler: day-before reminder (long task within 24h of deadline)');
   const now = Date.now();
-  const live = await api('/api/tasks', {
+  const longTask = await api('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({
       handlerId: handler.id,
-      title: 'Smoke Milestone Task',
-      description: 'Milestone timing test.',
-      startDateTime: zonedInput(new Date(now - 50 * 60000)), // started 50 min ago
-      durationMinutes: 100, // 50% elapsed now
+      title: 'Smoke Long Task',
+      description: 'Day-before timing test.',
+      startDateTime: zonedInput(new Date(now - 2 * 24 * 60 * 60 * 1000)), // started 2 days ago
+      durationMinutes: 2 * 24 * 60 + 12 * 60, // ~60h → deadline in ~12h
     }),
   });
-  assert(live.status === 201, 'in-flight task created');
-  const liveId = live.data.task.id;
+  assert(longTask.status === 201, 'long task created');
+  const longId = longTask.data.task.id;
 
-  // 50%: first cycle fires the reminder + 50% milestone.
   await runSchedulerCycle(new Date());
-  const at50 = await prisma.task.findUnique({ where: { id: liveId } });
-  assert(at50?.milestone50Sent === true, '50% milestone sent once');
-  assert(at50?.milestone70Sent === false, '70% milestone not sent yet');
-  assert(at50?.lastReminderAt != null, 'handler reminder recorded');
+  const longRow = await prisma.task.findUnique({ where: { id: longId } });
+  assert(longRow?.dayBeforeReminderSent === true, 'day-before reminder flagged once');
+  const dayBeforeLogs = await prisma.notificationLog.count({
+    where: { taskId: longId, notificationType: 'DAY_BEFORE_REMINDER' },
+  });
+  assert(dayBeforeLogs === 2, 'day-before reminder sent to handler and admin');
 
-  // 70%: advance the clock 20 minutes (70% of 100 min).
-  await runSchedulerCycle(new Date(now + 20 * 60000));
-  const at70 = await prisma.task.findUnique({ where: { id: liveId } });
-  assert(at70?.milestone70Sent === true, '70% milestone sent once');
+  console.log('→ Scheduler: short task skips the day-before reminder');
+  const shortTask = await api('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      handlerId: handler.id,
+      title: 'Smoke Short Task',
+      description: 'Short-task timing test.',
+      startDateTime: zonedInput(new Date(now)),
+      durationMinutes: 4 * 60, // 4 hours
+    }),
+  });
+  const shortId = shortTask.data.task.id;
+  await runSchedulerCycle(new Date());
+  const shortRow = await prisma.task.findUnique({ where: { id: shortId } });
+  assert(shortRow?.dayBeforeReminderSent === false, 'short task has no day-before reminder');
+  assert(shortRow?.deadlineNotificationSent === false, 'short task not past deadline yet');
 
   console.log('→ Duplicate protection on re-run');
-  const dupBefore = await prisma.notificationLog.count({ where: { taskId: liveId } });
-  await runSchedulerCycle(new Date(now + 20 * 60000));
-  const dupAfter = await prisma.notificationLog.count({ where: { taskId: liveId } });
-  assert(dupBefore === dupAfter, 'no duplicate milestone notifications');
+  const dupBefore = await prisma.notificationLog.count({ where: { taskId: longId } });
+  await runSchedulerCycle(new Date());
+  const dupAfter = await prisma.notificationLog.count({ where: { taskId: longId } });
+  assert(dupBefore === dupAfter, 'no duplicate reminders on re-run');
 
-  // Clean up the milestone task.
-  await api(`/api/tasks/${liveId}`, { method: 'DELETE' });
+  // Clean up the timing-test tasks.
+  await api(`/api/tasks/${longId}`, { method: 'DELETE' });
+  await api(`/api/tasks/${shortId}`, { method: 'DELETE' });
 
   console.log('→ Duplicate protection (deadline task)');
   const before = await prisma.notificationLog.count({ where: { taskId } });
   await runSchedulerCycle(new Date());
   const after = await prisma.notificationLog.count({ where: { taskId } });
-  assert(before === after, 'no duplicate deadline notification on re-run');
+  assert(before === after, 'no duplicate deadline reminder on re-run');
 
   console.log('→ Notifications history');
   const notifs = await api(`/api/notifications?taskId=${taskId}`);

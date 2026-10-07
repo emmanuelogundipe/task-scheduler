@@ -20,10 +20,8 @@ interface NotificationRow {
 const TYPES = [
   'ALL',
   'TASK_ASSIGNED',
-  'TASK_REMINDER',
-  'MILESTONE_50',
-  'MILESTONE_70',
-  'DEADLINE_REACHED',
+  'DAY_BEFORE_REMINDER',
+  'DEADLINE_REMINDER',
   'TEST_MESSAGE',
 ];
 const STATUSES = ['ALL', 'SENT', 'FAILED', 'PENDING'];

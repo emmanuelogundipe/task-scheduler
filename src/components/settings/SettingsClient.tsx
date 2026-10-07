@@ -28,7 +28,6 @@ export default function SettingsClient() {
   const [name, setName] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [passcode, setPasscode] = useState('');
-  const [interval, setInterval] = useState(30);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [testMsg, setTestMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -42,7 +41,6 @@ export default function SettingsClient() {
     setWhatsapp(data.whatsapp);
     setName(data.settings.adminName);
     setWhatsappNumber(data.settings.adminWhatsapp);
-    setInterval(data.settings.reminderIntervalMinutes);
   }, []);
 
   useEffect(() => {
@@ -60,7 +58,6 @@ export default function SettingsClient() {
         body: JSON.stringify({
           adminName: name,
           adminWhatsapp: whatsappNumber,
-          reminderIntervalMinutes: interval,
           ...(passcode ? { adminPasscode: passcode } : {}),
         }),
       });
@@ -137,21 +134,6 @@ export default function SettingsClient() {
               minLength={4}
               autoComplete="new-password"
             />
-          </div>
-          <div>
-            <label className="label">Reminder Interval (minutes)</label>
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              className="input"
-              value={interval}
-              onChange={(e) => setInterval(Number(e.target.value))}
-              required
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Reminders are sent to BOTH the admin and the task handler at 5 intervals before a task completes.
-            </p>
           </div>
           <div className="sm:col-span-2">
             <button type="submit" className="btn-primary" disabled={saving}>
@@ -243,10 +225,10 @@ export default function SettingsClient() {
           <span className="text-slate-300"> ({settings?.timezone ?? 'Africa/Lagos'})</span>.
         </p>
         <ul className="list-inside list-disc space-y-1 text-sm text-slate-400">
-          <li>Assignment WhatsApp is sent immediately when a task is created.</li>
-          <li>Reminders go to the admin and the task handler equally at 5 intervals before completion.</li>
-          <li>The administrator is notified once at 50% and once at 70% of the task duration.</li>
-          <li>A single deadline notification is sent if a task is not completed on time.</li>
+          <li>Exactly <b>three</b> reminders are sent per task, to <b>both</b> the task handler and the administrator.</li>
+          <li><b>1. On assignment</b> — the moment the task is created.</li>
+          <li><b>2. One day before</b> the deadline — skipped automatically for tasks shorter than 24 hours.</li>
+          <li><b>3. On the deadline</b> — when the deadline is reached.</li>
           <li>Completed and cancelled tasks never generate further notifications.</li>
         </ul>
       </section>
