@@ -35,6 +35,7 @@ Admin → Odyssey Scheduler → UltraMsg → WhatsApp
 - **Settings** — edit admin name, login WhatsApp number and passcode; configure the reminder interval; test the WhatsApp connection.
 - **Africa/Lagos timezone** — all task times, deadlines and progress are computed in the configured timezone, regardless of the server's local timezone.
 - **Responsive UI** — professional, lightweight Tailwind interface for desktop, tablet and mobile.
+- **Installable PWA** — add Odyssey Scheduler to a phone or desktop home screen with an app icon, splash screen and full-screen (standalone) window. No app store required.
 - **PostgreSQL database** — works with a free Neon database or local Docker; no paid hosting required.
 - **Login rate-limiting** — repeated failed attempts are throttled to slow brute-force attacks.
 - **Optional external cron endpoint** — `/api/cron/run` (secret-guarded) lets reminders run on hosts without a long-running process.
@@ -263,6 +264,29 @@ uses an **external PostgreSQL** database, so no paid disk or card is required.
    verify the connection. A test message is sent to the admin's WhatsApp number.
 
 No Google or email account is needed at any point.
+
+---
+
+## 📲 Installing as an App (PWA)
+
+Odyssey Scheduler is an installable Progressive Web App. Install it from the
+browser on any device — no app store required.
+
+**Android (Chrome):** open the site → tap the **Install** banner, or ⋮ menu →
+**Add to Home screen**.
+
+**iPhone / iPad (Safari):** open the site → **Share** → **Add to Home Screen**.
+
+**Windows / macOS / Linux (Chrome/Edge):** click the **install** icon in the
+address bar, or the **Install** banner.
+
+Once installed it opens in its own full-screen window with the Odyssey icon, a
+splash screen, and an offline notice if the connection drops. Tasks, approvals
+and WhatsApp reminders all continue to work exactly as before.
+
+- **Manifest:** `/manifest.webmanifest` (`src/app/manifest.ts`)
+- **Service worker:** `/sw.js` (static asset caching + offline page)
+- **Icons:** `public/icons/*` (regenerate with `scripts/generate-icons.ps1`)
 
 ---
 
